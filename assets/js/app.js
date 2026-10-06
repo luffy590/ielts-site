@@ -465,15 +465,17 @@ function buildDeck(host, items, opt){
 }
 function deckGo(key,d){
   var host=document.querySelector('.decken[data-deck="'+key+'"]');
-  if(!host) return;
+  if(!host) return false;
   var n=parseInt(host.getAttribute('data-n'),10)||1;
   var i=(parseInt(host.getAttribute('data-i'),10)||0)+d;
   i=Math.max(0,Math.min(n-1,i));
-  if(i===(parseInt(host.getAttribute('data-i'),10)||0)) return;
+  
+  if(i===(parseInt(host.getAttribute('data-i'),10)||0)) return false;
   stopAudio();                       
   DECKI[key]=i;
   markStudied(key,i);
   rerenderMod(key);
+  return true;
 }
 function deckGesture(deckEl,key){
   if(!deckEl) return;
@@ -497,8 +499,9 @@ function deckGesture(deckEl,key){
   function up(){
     if(!drag) return;
     drag=false; inner.classList.remove('drag');
-    if(moved && Math.abs(dx)>45){ deckGo(key, dx<0?1:-1); }
-    else { inner.style.transform='translateX(-'+(i*100)+'%)'; }
+    
+    var turned=moved && Math.abs(dx)>45 && deckGo(key, dx<0?1:-1);
+    if(!turned) inner.style.transform='translateX(-'+(i*100)+'%)';
     dx=0;
     
   }
