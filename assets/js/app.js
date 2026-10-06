@@ -37,10 +37,20 @@ var renderPrivacyRow=function(){};
 
 
 
+
 var STACK=['home'];
+var HAS_HIST=(typeof history!=='undefined' && history && typeof history.pushState==='function');
+function _navState(){ return {p:STACK[STACK.length-1], s:STACK.slice()}; }
+function navPush(id){
+  
+  if(STACK[STACK.length-1]===id){ _show(id); return; }
+  STACK.push(id);
+  if(HAS_HIST){ try{ history.pushState(_navState(),''); }catch(e){ HAS_HIST=false; } }
+  _show(id);
+}
 function go(id){
   
-  STACK.push(id); _show(id);
+  navPush(id);
 }
 function _show(id){
   reportPV(id);   
@@ -81,9 +91,24 @@ function updateNav(id){
 }
 function back(){
   
-  if(STACK.length>1){ STACK.pop(); _show(STACK[STACK.length-1]); }
-  else { STACK=['home']; _show('home'); }
+  if(STACK.length>1){
+    if(HAS_HIST){ try{ history.back(); return; }catch(e){ HAS_HIST=false; } }
+    STACK.pop(); _show(STACK[STACK.length-1]);
+    return;
+  }
+  STACK=['home']; _show('home');
 }
+
+window.addEventListener('popstate',function(e){
+  var st=e.state;
+  if(st && st.p && st.s && document.getElementById('sc-'+st.p)){
+    STACK=st.s.slice(); _show(st.p); return;
+  }
+  
+  var h=(location.hash||'').replace(/^#\/?/,'');
+  if(h && h!=='home' && document.getElementById('sc-'+h)){ STACK=['home',h]; _show(h); return; }
+  STACK=['home']; _show('home');
+});
 function toast(m){ var e=document.getElementById('toast'); e.textContent=m; e.classList.add('show');
   clearTimeout(e._t); e._t=setTimeout(function(){e.classList.remove('show')},2000); }
 
@@ -816,6 +841,8 @@ function _showResult(){
   var qiPos=STACK.lastIndexOf('quiz');
   if(qiPos>=0) STACK.splice(qiPos,1); // 去掉 quiz，返回直通「旅行场景」
   STACK.push('result');
+  
+  if(HAS_HIST){ try{ history.replaceState(_navState(),''); }catch(e){ HAS_HIST=false; } }
   _show('result');
   var total=quiz.length, ace=(qright===total);
   document.getElementById('rN').textContent=qright;
@@ -1079,8 +1106,9 @@ document.addEventListener('click',function(e){
 document.querySelectorAll('.tbi[data-tab]').forEach(function(el){ el.addEventListener('click',function(){
   var id=this.getAttribute('data-tab')==='home'?'home':'mine';
   
-  if(STACK[STACK.length-1]===id){ _show(id); return; }
-  STACK.push(id); _show(id);
+  var same=(STACK[STACK.length-1]===id);
+  navPush(id);
+  if(same) return;
   track('tab_switch',id);
   if(id==='mine') renderMine();
 }); });
@@ -1126,12 +1154,14 @@ track('session_start');
 scheduleAsk(60000);
 
 (function(){
+  
+  STACK=['home'];
+  if(HAS_HIST){ try{ history.replaceState(_navState(),''); }catch(e){ HAS_HIST=false; } }
   var h=location.hash.replace(/^#\/?/,'');
-  if(h && document.getElementById('sc-'+h)){
+  if(h && h!=='home' && document.getElementById('sc-'+h)){
     
-    STACK=['home'];
-    if(h!=='home') STACK.push(h);
-    _show(h); return;
+    navPush(h);
+    return;
   }
   
   _show('home');
