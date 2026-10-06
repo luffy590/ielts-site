@@ -68,7 +68,7 @@ function _show(id){
   if(id==='words'){ renderWords(); markStudied(WORDMOD, DECKI[WORDMOD]||0); track('study_view',{mod:WORDMOD}); studyEnter(WORDMOD); scheduleAsk(8000); }   
   if(id==='fav') renderFav();
   if(id==='scenes') renderRail();   
-  if(id==='home'){ renderHomeOv(); renderMwideStat(); renderVocabStat(); reportUV('home'); if(!window.__cmTracked){ window.__cmTracked=1; track('community_view','home'); } }
+  if(id==='home'){ renderHomeOv(); renderMwideStat(); renderVocabStat(); reportUV('home'); if(!window.__cmTracked){ window.__cmTracked=1; track('community_view',{where:'home'}); } }
   if(id==='mine'){ renderMine(); askConsentOnce(); renderPrivacyRow(); }   
   if(id==='fav-scene') renderFavCat('scene', document.getElementById('favSceneHead'), document.getElementById('favSceneBody'));
   if(id==='fav-word')  renderFavCat('word',  document.getElementById('favWordHead'),  document.getElementById('favWordBody'));
@@ -945,6 +945,8 @@ function reportUV(page){
 
 function track(event,extra){
   if(!consentOK()) return;                  
+  
+  if(typeof extra==='string') extra={v:extra};
   var devid=getDevId(), ts=Date.now();
   
   if(PA.USE_MOCK){ console.log('[mock][uv][event] ->',event, extra?JSON.stringify(extra):''); return; }
@@ -1112,7 +1114,7 @@ document.querySelectorAll('.tbi[data-tab]').forEach(function(el){ el.addEventLis
   var same=(STACK[STACK.length-1]===id);
   navPush(id);
   if(same) return;
-  track('tab_switch',id);
+  track('tab_switch',{tab:id});
   if(id==='mine') renderMine();
 }); });
 
