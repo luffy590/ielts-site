@@ -1,0 +1,151 @@
+
+
+
+var SYN_CATS = ['核心词族替换', '中文小类替换', '篇目定位替换'];
+
+
+var SYNW_CATS = ['论证替换', '图表替换', '流程与地图'];
+
+var SYN_INFO = {
+ 
+ 'increase': {
+  cat:'核心词族替换', title:'增长 / 上升',
+  note:'increase → rise / grow / climb，涨的那几种说法。',
+  
+  mnemonic:[
+   '原行中文是「增加、增长 / 上升 / 攀升」—— 三个义项，同义词列是并集，所以归成一组',
+   'rise 最中性，说数据、说价格都行；climb 偏「慢慢往上爬」，多跟数字一起出现',
+   '△ 原行的 mount（登上、增加）只此一义且与 increase 核心义不同，已删，见台账'
+  ],
+  words:{
+   'increase':{lv:'基础', coll:[['increase sharply','急剧上升'],['a sharp increase','大幅增长']]},
+   'rise':{lv:'加分', coll:[['rise steadily','稳步上升'],['on the rise','在上升']]},
+   'grow':{lv:'加分', coll:[['grow rapidly','迅速增长'],['grow in number','数量增加']]},
+   'climb':{lv:'加分', coll:[['climb to 30%','攀升到 30%']]}
+  }
+ },
+ 'reduce': {
+  cat:'中文小类替换', title:'减少 / 下降',
+  note:'reduce → decrease / decline / diminish，降的那几种说法。',
+  mnemonic:[
+   '这一组是「减少 / 下降」一路：四个词都指数量往下走，题干里常互相替换',
+   'decrease 最中性；decline 偏「逐步下滑」，也可指「拒绝」；diminish 偏「削弱、变小」，多跟抽象名词',
+   '△ reduce 是及物动词：说幅度用 by，说降到多少用 to（reduce by 20% / reduce to 20%）'
+  ],
+  words:{
+   'reduce':{lv:'基础', coll:[['reduce by 20%','减少 20%'],['reduce to','降到']]},
+   'decrease':{lv:'加分', coll:[['decrease sharply','急剧下降'],['a decrease in','…的减少']]},
+   'decline':{lv:'加分', coll:[['a sharp decline','急剧下滑'],['decline to comment','拒绝置评']]},
+   'diminish':{lv:'加分', coll:[['diminish the effect','削弱效果'],['diminishing returns','收益递减']]}
+  }
+ },
+ 'different': {
+  cat:'篇目定位替换', title:'不同的 / 多样的',
+  note:'different → distinct / disparate / varied，比较类题目的题干核心。',
+  mnemonic:[
+   '这一组是「不同的 / 多样的」一路，比较类题干的核心词，出现它就要去找对比的两方',
+   'distinct 强调「区分得开」；disparate 强调「差得远、不相干」；varied 强调「种类多」',
+   '△ different 最中性：题干里它往往只是引子，真正的考点在后面那个名词上'
+  ],
+  words:{
+   'different':{lv:'基础', coll:[['different from','与…不同'],['a different approach','另一种方法']]},
+   'distinct':{lv:'加分', coll:[['distinct from','与…截然不同'],['a distinct possibility','明显的可能性']]},
+   'disparate':{lv:'加分', coll:[['disparate groups','迥然不同的群体'],['disparate ideas','互不相干的想法']]},
+   'varied':{lv:'加分', coll:[['a varied diet','多样的饮食'],['varied experience','丰富的经历']]}
+  }
+ },
+ 'important': {
+  cat:'篇目定位替换', title:'重要的',
+  note:'important → significant / crucial / vital，题干里最不值钱也最容易漏的一类。',
+  mnemonic:[
+   '这一组是「重要的」一路，题干里最不值钱、也最容易一眼扫过去的一类词',
+   'significant 偏「显著」（常带统计意味）；crucial 偏「决定性」；vital 偏「不可或缺」',
+   '△ 看到 important 别停：它后面跟的名词通常才是要回原文找的东西'
+  ],
+  words:{
+   'important':{lv:'基础', coll:[['play an important role','起重要作用'],['important to','对…重要']]},
+   'significant':{lv:'加分', coll:[['a significant increase','显著增长'],['statistically significant','统计上显著']]},
+   'crucial':{lv:'加分', coll:[['crucial to','对…至关重要'],['a crucial factor','关键因素']]},
+   'vital':{lv:'加分', coll:[['vital to','对…必不可少'],['of vital importance','至关重要']]}
+  }
+ },
+ 'understand': {
+  cat:'篇目定位替换', title:'理解 / 领会',
+  note:'understand → comprehend / grasp / apprehend，用来定位「作者观点」句。',
+  mnemonic:[
+   '这一组是「理解 / 领会」一路，作者观点句里最常见的动词，定位时先抓它',
+   'comprehend 偏「理解得透」；grasp 偏「抓住要点」；apprehend 偏「领会」（也可指「逮捕」）',
+   '△ 观点题里它常和 view / argue / suggest 同句出现，先看动词再看宾语'
+  ],
+  words:{
+   'understand':{lv:'基础', coll:[['understand the point','理解要点'],['fully understand','充分理解']]},
+   'comprehend':{lv:'加分', coll:[['comprehend the text','理解文本'],['hard to comprehend','难以理解']]},
+   'grasp':{lv:'加分', coll:[['grasp the idea','抓住要点'],['grasp the opportunity','抓住机会']]},
+   'apprehend':{lv:'加分', coll:[['apprehend the meaning','领会含义'],['apprehend a suspect','逮捕嫌疑人']]}
+  }
+ }
+};
+
+
+var SYNW_INFO = {
+ 'important': {
+  cat:'论证替换', title:'重要的',
+  note:'important → significant / crucial / vital，作文里最该换掉的那一个词。',
+  mnemonic:[
+   '这一组是「重要的」一路：作文里出现频率最高、也最该换掉的一类词',
+   'significant 偏「显著」（常跟数据、差异）；crucial 偏「决定性」；vital 偏「不可或缺」',
+   '△ important 不是不能用：一段里出现两次就该换 —— 首句留它，论证句用后面三个'
+  ],
+  words:{
+   'important':{lv:'基础', coll:[['play an important role','起重要作用'],['important to','对…重要']]},
+   'significant':{lv:'加分', coll:[['a significant increase','显著增长'],['statistically significant','统计上显著']]},
+   'crucial':{lv:'加分', coll:[['crucial to','对…至关重要'],['a crucial factor','关键因素']]},
+   'vital':{lv:'加分', coll:[['vital to','对…必不可少'],['of vital importance','至关重要']]}
+  }
+ },
+ 'think': {
+  cat:'论证替换', title:'认为 / 主张',
+  note:'think → believe / argue / maintain，议论文里表态的那几种说法。',
+  mnemonic:[
+   '这一组是「认为 / 主张」一路：议论文表态句的主干动词，换掉 think 立刻不像口语',
+   'believe 偏「相信」；argue 偏「论证、主张」；maintain 偏「坚持认为」（常接与对方相反的观点）',
+   '△ argue 后面跟的是观点不是人（argue that…）；要「反驳某人」用 argue against'
+  ],
+  words:{
+   'think':{lv:'基础', coll:[['think that','认为'],['think about','考虑']]},
+   'believe':{lv:'加分', coll:[['believe that','相信'],['it is believed that','人们认为']]},
+   'argue':{lv:'加分', coll:[['argue that','主张'],['argue against','反驳']]},
+   'maintain':{lv:'加分', coll:[['maintain that','坚持认为'],['maintain a balance','保持平衡']]}
+  }
+ },
+ 'show': {
+  cat:'图表替换', title:'表明 / 显示',
+  note:'show → demonstrate / indicate / illustrate，图表作文与论证句共用的一组。',
+  mnemonic:[
+   '这一组是「表明 / 显示」一路：图表描述和论证句都用得上',
+   'demonstrate 偏「论证、演示」；indicate 偏「数据显示」；illustrate 偏「举例说明」',
+   '△ 图表作文里 indicate 最稳（The chart indicates that…）；举例子用 illustrate'
+  ],
+  words:{
+   'show':{lv:'基础', coll:[['show that','表明'],['show a trend','显示趋势']]},
+   'demonstrate':{lv:'加分', coll:[['demonstrate that','论证'],['demonstrate the point','说明观点']]},
+   'indicate':{lv:'加分', coll:[['indicate that','表明'],['the data indicate','数据显示']]},
+   'illustrate':{lv:'加分', coll:[['illustrate the point','说明观点'],['as illustrated in','如…所示']]}
+  }
+ },
+ 'change': {
+  cat:'流程与地图', title:'改变 / 改造',
+  note:'change → transform / convert / alter，流程图与地图题里描述变化的几种说法。',
+  mnemonic:[
+   '这一组是「改变 / 改造」一路：流程图与地图题描述变化时最常用',
+   'transform 偏「彻底转变」；convert 偏「转换用途 / 形式」；alter 偏「局部改动」',
+   '△ 流程图用 transform / convert 更稳；地图题描述布局改动用 alter 或 change'
+  ],
+  words:{
+   'change':{lv:'基础', coll:[['change dramatically','急剧变化'],['bring about change','带来变化']]},
+   'transform':{lv:'加分', coll:[['transform A into B','把 A 变成 B'],['transform the landscape','改变地貌']]},
+   'convert':{lv:'加分', coll:[['convert A into B','把 A 转换成 B'],['convert into','转变为']]},
+   'alter':{lv:'加分', coll:[['alter the layout','改变布局'],['alter significantly','显著改变']]}
+  }
+ }
+};
