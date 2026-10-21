@@ -2,7 +2,7 @@
 
 
 var SCENES=[
- {id:'travel',no:1,name:'旅行 · 观光与行程',en:'TRAVEL',sub:'5 站 · 47 词',n:'旅',c1:'#3370ff',c2:'#eaf0ff',ready:1,tag:'免费体验'},
+ {id:'travel',no:1,name:'听力场景课 · 27天场景词',en:'LISTENING',sub:'27 站 · 2760 词',n:'听',c1:'#3370ff',c2:'#eaf0ff',ready:1,tag:'免费体验'},
  {id:'rent',no:2,name:'租房 · 住宿与家具',sub:'5 站 · 98 词 · 规划',n:'租',c1:'#3370ff',c2:'#eaf0ff',ready:0},
  {id:'trans',no:3,name:'交通 · 票务与班次',sub:'5 站 · 24 词 · 规划',n:'交',c1:'#3370ff',c2:'#eaf0ff',ready:0},
  {id:'school',no:4,name:'校园 · 新生与选课',sub:'5 站 · 规划',n:'校',c1:'#3370ff',c2:'#eaf0ff',ready:0},

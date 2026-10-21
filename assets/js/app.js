@@ -84,7 +84,7 @@ function updateNav(id){
   
   var back = ['home','mine','login'].indexOf(id)<0;
   document.getElementById('backBtn').style.visibility=back?'visible':'hidden';
-  var T={home:'雅思提分宝',mine:'我的',scenes:'听力场景课',study:(sceneMod()?sceneMod().name:'旅行 · 观光与行程'),quiz:'听说自测',result:'自测结果',login:'登录',fav:'我的收藏',
+  var T={home:'雅思提分宝',mine:'我的',scenes:'听力场景课',study:(sceneMod()?sceneMod().name:'听力场景课 · 27天场景词'),quiz:'听说自测',result:'自测结果',login:'登录',fav:'我的收藏',
     'fav-scene':'收藏 · 场景课','fav-word':'收藏 · 专项词汇',
     words:((modOf(WORDMOD)||{}).name||'词汇专项'),     
     
@@ -163,7 +163,8 @@ function milestone(gid,complete){ if(!complete) return;
 
 function cardCount(m){                       
   if(!m) return 0;
-  if(m.kind==='scene'||m.list) return m.groups.length;   
+  if(m.kind==='scene') return sceneCards(m).length;      
+  if(m.list) return m.groups.length;                     
   var n=0; m.groups.forEach(function(g){ n+=Math.ceil(g.rows.length/WPER); }); return n;
 }
 
@@ -183,7 +184,16 @@ function markStudied(key,idx){
 
 function firstOpenCard(m){
   if(!m) return -1;
-  if(m.kind==='scene'||m.list){      
+  if(m.kind==='scene'){
+    var sc=sceneCards(m);
+    for(var j=0;j<sc.length;j++){
+      var c=sc[j], n=0;
+      c.rows.forEach(function(r,k){ if((S.done||{})[c.keys[k]]) n++; });
+      if(n<c.rows.length) return j;
+    }
+    return -1;
+  }
+  if(m.list){                         
     for(var j=0;j<m.groups.length;j++){ var st=m.groups[j],d=0;
       st.rows.forEach(function(r,k){ if((S.done||{})[st._keys[k]]) d++; });
       if(d<st.rows.length) return j; }
@@ -245,32 +255,25 @@ function renderHomeOv(){
 function modDone(){ var n=0; MODS.forEach(function(m){ m.groups.forEach(function(g){
   g.rows.forEach(function(r,i){ if((S.done||{}).hasOwnProperty(g._keys[i])) n++; }); }); }); return n; }
 function renderRail(){
-  var rail=document.getElementById('scRail'); var h='';
-  SCENES.forEach(function(s){
-    var right;
-    var m=modOf(s.id);   
-    if(m && m.kind==='scene'){
-      
-      var tot=0, set={};
-      m.groups.forEach(function(g){ g.rows.forEach(function(r,i){ tot++; set[g._keys[i]]=1; }); });
-      var done=0; for(var k in (S.done||{})){ if(set[k]) done++; }
-      var pct= tot? Math.round(done/tot*100):0;
-      right='<div class="sprog"><div class="sbar"><i style="width:'+pct+'%"></i></div><span>已听 '+done+'/'+tot+' 词</span></div>';
-    } else if(s.id==='more'){
-      right='';   
-    } else {
-      right='<span class="badge wip" style="background:#eaf1ff;color:#3f6fd8">制作中</span>';
-    }
-    
-    var sub=(m && m.kind==='scene')
-      ? (m.groups.length+' 站 · '+m.groups.reduce(function(n,g){return n+g.rows.length;},0)+' 词')
-      : s.sub;
-    h+='<div class="stop"><div class="disc d'+(s.no%9||9)+'">'+s.no+'</div><div class="card" data-sc="'+s.id+'">'+
-       '<div class="info"><b>'+s.name+'</b><small>'+sub+'</small></div>'+right+'</div></div>';
-  });
-  rail.innerHTML=h;
+  var rail=document.getElementById('scRail'); if(!rail) return;
+  var m=sceneMod();
   
-  rail.querySelectorAll('[data-sc]').forEach(function(c){ c.addEventListener('click',function(){ onScene(c.getAttribute('data-sc')); }); });
+  if(m && m.kind==='scene' && m.groups.length){
+    var h='';
+    m.groups.forEach(function(g,gi){
+      var done=0, total=g.rows.length;
+      g.rows.forEach(function(r,j){ if((S.done||{}).hasOwnProperty(g._keys[j])) done++; });
+      var pct=total?Math.round(done/total*100):0;
+      var sub=((g.en||'')+' · '+total+' 词').replace(/^ · /,'');
+      h+='<div class="stop"><div class="disc d'+((gi+1)%9||9)+'">'+(gi+1)+'</div>'
+        +'<div class="card" data-group="'+gi+'"><div class="info"><b>'+g.name+'</b><small>'+sub+'</small></div>'
+        +'<div class="sprog"><div class="sbar"><i style="width:'+pct+'%"></i></div>'
+        +'<span>已听 '+done+'/'+total+' 词</span></div></div></div>';
+    });
+    rail.innerHTML=h;
+    return;
+  }
+  rail.innerHTML='<div class="stop"><div class="disc d1">·</div><div class="card"><div class="info"><b>内容制作中</b><small>该模块暂未导入分组词表</small></div></div></div>';
 }
 
 
@@ -316,7 +319,7 @@ SCENES.forEach(function(s){
   var gs=(typeof MODULE_GROUPS!=='undefined') && MODULE_GROUPS[s.id];
   if(!gs || !gs.length) return;
   MODS.push({key:s.id,kind:'scene',no:s.no,name:s.name,short:s.name.split(' · ')[0],
-             en:s.en||'',unit:'站',ic:ICONS.headphones,c:'#3370ff',to:'study',groups:gs});
+             en:s.en||'',unit:'组',ic:ICONS.headphones,c:'#3370ff',to:'study',groups:gs});
 });
 
 WORD_MODULES.forEach(function(w){
@@ -371,6 +374,31 @@ migrateKeys();
 function modOf(k){ return MODS.filter(function(m){return m.key===k})[0]; }
 function sceneMod(){ return modOf(SCENEKEY); }
 function sceneGroups(){ var m=sceneMod(); return m?m.groups:[]; }
+
+function sceneSubgroups(g){
+  var out=[], last=null;
+  g.rows.forEach(function(r,i){
+    var name=r[6]||g.name;
+    if(!last || last.name!==name){
+      last={name:name,rows:[],keys:[]};
+      out.push(last);
+    }
+    last.rows.push(r);
+    last.keys.push(g._keys[i]);
+  });
+  return out;
+}
+function sceneCards(m){
+  if(!m) return [];
+  var out=[];
+  m.groups.forEach(function(g,gi){
+    sceneSubgroups(g).forEach(function(s,si){
+      out.push({idx:out.length,name:s.name,rows:s.rows,keys:s.keys,gi:gi,si:si,
+                dayName:g.name,dayEn:g.en||''});
+    });
+  });
+  return out;
+}
 
 function rerenderMod(key){
   var m=modOf(key); if(!m) return;
@@ -495,8 +523,11 @@ function deckGo(key,d){
   
   if(i===(parseInt(host.getAttribute('data-i'),10)||0)) return false;
   stopAudio();                       
-  DECKI[key]=i;
-  markStudied(key,i);
+  var dm=modOf(key);
+  var gis=(host.getAttribute('data-gis')||'').split(',');
+  var target=(dm && dm.kind==='scene' && gis[i]!==undefined) ? parseInt(gis[i],10) : i;
+  DECKI[key]=target;
+  markStudied(key,target);
   rerenderMod(key);
   window.scrollTo(0,0);              
   return true;
@@ -504,23 +535,35 @@ function deckGo(key,d){
 
 function rowHtml(r,key,opt){
   opt=opt||{};
-  var ipa=r[2]||'', pos=r[3]||'';
+  var ipa=r[2]||'', pos=r[3]||'', coll=r[4]||'', note=r[5]||'';
+  var ext=[];
+  if(coll) ext.push('<span class="exti">'+coll+'</span>');
+  if(note) ext.push('<span class="exti">'+note+'</span>');
   var ok=(S.done||{}).hasOwnProperty(key);
   var fav=(opt.fav!==undefined)? !!opt.fav : (S.fav||{}).hasOwnProperty(key);
-  return '<div class="rw'+(ok?' ok':'')+(fav?' fav':'')+((ipa||pos)?' dict':'')
+  return '<div class="rw'+(ok?' ok':'')+(fav?' fav':'')+((ipa||pos||ext.length)?' dict':'')
     +'" data-k="'+key+'" data-en="'+r[0]+'"'+(opt.mk?' data-mk="'+opt.mk+'"':'')+'>'
     +'<span class="spk"></span>'
     +'<span class="wd"><span class="w">'+r[0]+'</span>'
     +(ipa?'<span class="ipa">'+ipa+'</span>':'')
     +(pos?'<span class="pos">'+pos+'</span>':'')
-    +'<span class="cn">'+r[1]+'</span></span>'
+    +'<span class="cn">'+r[1]+'</span>'
+    +(ext.length?'<span class="ext">'+ext.join(' ')+'</span>':'')
+    +'</span>'
     +'<span class="ck" title="点 ✓ 可取消「已听」">✓</span>'
     +'<span class="fv'+(fav?' on':'')+'" data-fav="'+key+'" title="'
     +(opt.favTitle||'收藏')+'">'+(fav?'★':'☆')+'</span></div>';
 }
-function cardRows(rows,keys){
-  var h='';
-  rows.forEach(function(r,i){ h+=rowHtml(r,keys[i]); });
+function cardRows(rows,keys,opt){
+  opt=opt||{};
+  
+  var h='', lastSub='';
+  rows.forEach(function(r,i){
+    var sub=r[6]||'';
+    if(!opt.skipSub && sub && sub!==lastSub) h+='<div class="subh">'+sub+'</div>';
+    lastSub=sub;
+    h+=rowHtml(r,keys[i]);
+  });
   return h;
 }
 
@@ -549,13 +592,20 @@ function bindRows(host){
         renderMine();
         var grpDone=false, grpTotal=0;
         try{
-          var gis=(host.getAttribute('data-gis')||'').split(',').map(Number);
-          var gi=gis[DECKI[dk]||0];
-          var dm=modOf(dk); var grp = dm ? dm.groups[gi] : null;
+          var dm=modOf(dk), grp=null, gid=dk;
+          if(dm && dm.kind==='scene'){
+            grp=sceneCards(dm)[DECKI[dk]||0]||null;
+            if(grp) gid=dk+':'+grp.gi+':'+grp.si;
+          }else if(dm){
+            var gis=(host.getAttribute('data-gis')||'').split(',').map(Number);
+            var gi=gis[DECKI[dk]||0];
+            grp=dm.groups[gi]||null;
+            gid=dk+':'+gi;
+          }
           if(grp){
             grpTotal=grp.rows.length;
-            grpDone=grp.rows.every(function(r,j){return (S.done||{})[grp._keys[j]];});
-            milestone(dk+':'+gi, grpDone);
+            grpDone=grp.rows.every(function(r,j){return (S.done||{})[grp.keys ? grp.keys[j] : grp._keys[j]];});
+            milestone(gid, grpDone);
           }
         }catch(err){}
         var listed=(dk==='conf'||dk==='synr'||dk==='synw');
@@ -568,47 +618,83 @@ function cardHead(name,en,cnt,ok,src){
   
   var done=ok>=cnt;
   return '<h3>'
-    +'<span class="ht">'+name+'</span>'
+    +(name?'<span class="ht">'+name+'</span>':'')
     +'<span class="cok'+(done?' done':'')+'">'+(done?'✓ 已全部听完':(ok+' / '+cnt+' 已听'))+'</span>'
-    +'<span class="en">'+(en==null?'':en)+'</span></h3>';
+    +(en?'<span class="en">'+en+'</span>':'')+'</h3>';
+}
+
+function syncStudyDeckHeight(){
+  var host=document.getElementById('studyBody');
+  if(!host) return;
+  var deck=host.querySelector('.deck');
+  if(!deck) return;
+  var i=parseInt(host.getAttribute('data-i'),10)||0;
+  var card=deck.querySelectorAll('.card2')[i];
+  if(card) deck.style.height=Math.ceil(card.getBoundingClientRect().height)+'px';
 }
 function renderStudy(reset){
   var host=document.getElementById('studyBody');
   var m=sceneMod(); if(!m) return;
-  var groups=m.groups;
+  var cards=sceneCards(m);
+  if(!cards.length){ host.innerHTML=''; return; }
+  if(reset) DECKI[m.key]=0;
+  var flat=Math.max(0,Math.min(parseInt(DECKI[m.key],10)||0,cards.length-1));
+  DECKI[m.key]=flat;
+  var cur=cards[flat], st=m.groups[cur.gi];
+  var dayCards=cards.filter(function(c){ return c.gi===cur.gi; });
+  var local=0;
+  for(var j=0;j<dayCards.length;j++){ if(dayCards[j].idx===flat){ local=j; break; } }
+  var allDone=0, tot=0;
+  st.rows.forEach(function(r,i){
+    tot++;
+    if((S.done||{}).hasOwnProperty(st._keys[i])) allDone++;
+  });
+
   
-  var kick=document.getElementById('studyKicker');
-  if(kick) kick.textContent='SCENE '+('0'+(m.no||1)).slice(-2)+(m.en?' · '+m.en:'');
   var ttl=document.getElementById('studyName');
-  if(ttl) ttl.textContent=m.name;
-  var items=[],gis=[],allDone=0,tot=0;
-  groups.forEach(function(st,i){
-    var stOk=0;
-    st.rows.forEach(function(r,j){ if((S.done||{}).hasOwnProperty(st._keys[j])) stOk++; });
-    allDone+=stOk; tot+=st.rows.length;
-    items.push({gi:i,html:'<div class="card2">'+cardHead(st.name,'STOP '+(i+1)+' · '+st.en,st.rows.length,stOk,'real')
-      +cardRows(st.rows, st._keys)+'</div>'});
-    gis.push(i);
-  });
-  var cur=buildDeck(host,items,{key:m.key,unit:m.unit,gis:gis,reset:reset,hideBar:true,
-    bind:function(h){ bindRows(h); }});
-  var pg=document.getElementById('studyPager');
-  if(pg) pg.innerHTML=pagerHtml(cur,groups.length,'站',m.key);
+  if(ttl) ttl.textContent=st.name;
+
   
+  var items=[];
+  dayCards.forEach(function(c,ci){
+    var ok=0;
+    c.rows.forEach(function(r,i){ if((S.done||{}).hasOwnProperty(c.keys[i])) ok++; });
+    items.push({html:'<div class="card2">'+cardHead('','',c.rows.length,ok,'real')
+      +cardRows(c.rows,c.keys,{skipSub:true})+'</div>'});
+  });
+  host.innerHTML='<div class="deck"><div class="deckin" style="transform:translateX(-'+(local*100)+'%)">'
+    +items.map(function(it){ return it.html; }).join('')+'</div></div>';
+  host.setAttribute('data-deck',m.key);
+  host.setAttribute('data-i',local);
+  host.setAttribute('data-n',dayCards.length);
+  host.setAttribute('data-gis',dayCards.map(function(c){ return c.idx; }).join(','));
+  syncStudyDeckHeight();
+  bindRows(host);
+  var pg=document.getElementById('studyPager');
+  if(pg) pg.innerHTML=pagerHtml(local,dayCards.length,'组',m.key);
   var ch='';
-  groups.forEach(function(st,gi){
-    ch+='<span class="wchip'+(gis[cur]===gi?' on':'')+'" data-chip="'+gi+'">'+st.name+'<i>'+st.rows.length+'</i></span>';
+  dayCards.forEach(function(c){
+    ch+='<span class="wchip'+(c.idx===flat?' on':'')+'" data-chip="'+c.idx+'">'+c.name+'<i>'+c.rows.length+'</i></span>';
   });
-  document.getElementById('studyChips').innerHTML=ch;
-  var t=document.getElementById('stopTrack'); var th='';
-  groups.forEach(function(st){
-    var stAll=st.rows.length, stOk=0;
-    st.rows.forEach(function(r,j){ if((S.done||{}).hasOwnProperty(st._keys[j])) stOk++; });
-    th+='<i class="'+(stOk>=stAll?'done':'')+'" style="width:'+((stOk/stAll)*100).toFixed(0)+'%"></i>';
+  var chipBox=document.getElementById('studyChips');
+  chipBox.innerHTML=ch;
+  
+  var activeChip=chipBox.querySelector('.wchip.on');
+  if(activeChip){
+    var cr=chipBox.getBoundingClientRect(), ar=activeChip.getBoundingClientRect(), pad=8;
+    if(ar.left<cr.left+pad) chipBox.scrollLeft-=cr.left+pad-ar.left;
+    else if(ar.right>cr.right-pad) chipBox.scrollLeft+=ar.right-cr.right+pad;
+  }
+  var th='';
+  dayCards.forEach(function(c){
+    var ok=0;
+    c.rows.forEach(function(r,i){ if((S.done||{}).hasOwnProperty(c.keys[i])) ok++; });
+    th+='<i class="'+(ok>=c.rows.length?'done':'')+'" style="width:'+((ok/c.rows.length)*100).toFixed(0)+'%"></i>';
   });
-  t.innerHTML=th;
+  document.getElementById('stopTrack').innerHTML=th;
   document.getElementById('studyCnt').textContent='已听 '+allDone+' / '+tot+' 词 · 点词即听即打卡 · 点 ☆ 收藏';
 }
+window.addEventListener('resize', syncStudyDeckHeight);
 
 
 var WPER=10;   
@@ -623,7 +709,7 @@ function tint(hex,a){
 function emptyWordsHtml(m){
   return '<div class="card2 phcard"><h3><span class="ht">内容制作中</span><span class="cok">版式已就绪</span></h3>'
     +'<div class="phbody"><ul class="phlist">'
-    +'<li><b>'+m.name+'</b><span>词表制作中 —— 内容进了 content/words.csv 这一屏就会自动变成卡组</span></li>'
+    +'<li><b>'+m.name+'</b><span>词表制作中 —— 内容进了对应模块 CSV 后这一屏就会自动变成卡组</span></li>'
     +'</ul></div></div>';
 }
 
@@ -750,8 +836,7 @@ function renderList(){
   var introSub=(groups.length
     ? ('共 '+groups.length+' 组 · 整组已听 '+doneGroups+' 组 · 已听 '+done+' / '+tot+' 词 · 点卡片「查看」看每组词的说明')
     : '词表制作中 · 上线后这里是一组一张卡');
-  intro.innerHTML='<div class="k" style="color:rgba(255,255,255,.72)">WORD SET · '+m.en+'</div>'
-    +'<h2>'+m.name+'</h2>'
+  intro.innerHTML='<h2>'+m.name+'</h2>'
     +'<p>'+introSub+'</p>';
   var host=document.getElementById('cfList');
   var chips=document.getElementById('cfChips');
@@ -877,8 +962,7 @@ function renderWords(reset){
   intro.style.background=m.c;
   intro.style.boxShadow='none';
   intro.innerHTML=
-    '<div class="k" style="color:rgba(255,255,255,.72)">WORD SET · '+m.en+'</div>'
-    +'<h2>'+m.name+'</h2>'
+    '<h2>'+m.name+'</h2>'
     +'<p>'+(empty?'版式已就绪 · 词表制作中'
                  :'已听 '+allDone+' / '+tot+' 词 · 点词即听即打卡 · 点 ☆ 收藏')+'</p>';
   if(empty){
@@ -1339,7 +1423,7 @@ document.getElementById('backBtn').addEventListener('click',back);
 
 (function(){ var b=document.getElementById('copyLinkBtn'); if(b) b.addEventListener('click',copyLink); })();
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-to],[data-open],[data-s],[data-scene],[data-series],[data-mod],[data-cf],[data-cfpg],[data-chip],[data-scat]');
+  var t=e.target.closest('[data-to],[data-open],[data-s],[data-scene],[data-series],[data-mod],[data-group],[data-cf],[data-cfpg],[data-chip],[data-scat]');
   if(!t) return;
   var to=t.getAttribute('data-to');
   if(to){ go(to); return; }
@@ -1349,6 +1433,20 @@ document.addEventListener('click',function(e){
   if(sc){ onScene(sc); return; }
   var se=t.getAttribute('data-series');
   if(se){ go('scenes'); return; }
+  
+  var grp=t.getAttribute('data-group');
+  if(grp!==null&&grp!==undefined){
+    var gi=parseInt(grp,10);
+    if(!isNaN(gi)){
+      var cards=sceneCards(sceneMod()), target=0;
+      for(var ci=0;ci<cards.length;ci++){ if(cards[ci].gi===gi){ target=cards[ci].idx; break; } }
+      stopAudio();
+      DECKI[SCENEKEY]=target;
+      markStudied(SCENEKEY,target);
+      go('study');
+    }
+    return;
+  }
   
   var md=t.getAttribute('data-mod');
   
@@ -1383,7 +1481,11 @@ document.addEventListener('click',function(e){
       var key=deck.getAttribute('data-deck');
       var gis=(deck.getAttribute('data-gis')||'').split(',');
       var idx=gis.indexOf(cp);
-      if(idx>=0){ stopAudio(); DECKI[key]=idx; markStudied(key,idx); rerenderMod(key); }
+      if(idx>=0){
+        var dm=modOf(key);
+        var target=(dm && dm.kind==='scene') ? parseInt(cp,10) : idx;
+        stopAudio(); DECKI[key]=target; markStudied(key,target); rerenderMod(key);
+      }
     }
     return;
   }
@@ -1424,7 +1526,7 @@ function renderMwideStat(){
     g.rows.forEach(function(r,i){ wTot++; set[g._keys[i]]=1; });
   }); });
   for(var k in (S.done||{})){ if(set[k]) wDone++; }
-  el.innerHTML='已完成 '+sceneDone+'/'+sceneTot+' 场景 · '+stDone+'/'+stTot+' 站 · 已听 '+wDone+'/'+wTot+' 词';
+  el.innerHTML='已完成 '+sceneDone+'/'+sceneTot+' 场景 · '+stDone+'/'+stTot+' 组 · 已听 '+wDone+'/'+wTot+' 词';
   var bar=document.getElementById('mwBar'); if(bar) bar.style.width=(wTot?Math.round(wDone/wTot*100):0)+'%';
 }
 

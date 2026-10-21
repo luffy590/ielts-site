@@ -209,6 +209,8 @@
  .deckin{display:flex;align-items:stretch}
  .deckin>.card2{flex:0 0 100%;min-width:100%;margin-top:0}
  .deckin{transition:transform .28s cubic-bezier(.22,.7,.2,1)}
+
+#sc-study .deckin{align-items:flex-start}
  
  .wchips{display:flex;gap:7px;overflow-x:auto;padding:2px 0 4px;margin-top:12px;-webkit-overflow-scrolling:touch}
  .wchips::-webkit-scrollbar{display:none}
@@ -407,9 +409,16 @@ b,strong{font-weight:600}
 .rw .wd .cn{margin-left:auto}
 .rw .pos{flex:none;margin-right:2px;font:italic 12px/1.5 Georgia,"Times New Roman",serif;color:#9aa0a6;letter-spacing:.2px}
 .rw .ipa{flex:1 0 100%;font:11.5px/1.6 "Courier New",ui-monospace,Menlo,monospace;color:var(--faint);letter-spacing:0;word-break:break-word}
+.rw .ext{flex:1 0 100%;display:flex;flex-direction:column;row-gap:2px;
+  font-size:11.5px;line-height:1.65;color:#a3544d}
+.subh{margin:11px 2px 2px;font-size:11.5px;font-weight:700;line-height:1.5;color:var(--ink)}
+.card2 h3+.subh{margin-top:7px}
 .rw.dict{padding:11px 2px}
 .rw.dict .w{flex-basis:100%;font-size:16px}
 .rw.dict .wd .cn{margin-left:0;padding-left:0;text-align:left;color:var(--sub);font-size:12.5px;line-height:1.55}
+
+#sc-study .rw .wd .cn{margin-left:0;padding-left:0;text-align:left}
+#sc-study .rw:not(.dict) .wd .cn{flex:1 1 100%;color:var(--sub);font-size:12.5px;line-height:1.55}
 
 
 .phcard{border-style:dashed;border-color:#e2e7ee;background:#fbfcfd}
