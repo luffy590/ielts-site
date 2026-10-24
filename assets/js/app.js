@@ -692,7 +692,7 @@ function renderStudy(reset){
     th+='<i class="'+(ok>=c.rows.length?'done':'')+'" style="width:'+((ok/c.rows.length)*100).toFixed(0)+'%"></i>';
   });
   document.getElementById('stopTrack').innerHTML=th;
-  document.getElementById('studyCnt').textContent='已听 '+allDone+' / '+tot+' 词 · 点词即听即打卡 · 点 ☆ 收藏';
+  document.getElementById('studyCnt').textContent='已听 '+allDone+' / '+tot+' 词';
 }
 window.addEventListener('resize', syncStudyDeckHeight);
 
@@ -750,11 +750,23 @@ function groupProg(g){
 }
 
 function confWordHtml(w,hl){
-  var s=String(w), v=(hl||{})[w], seg='', i=-1;
-  if(Array.isArray(v)){ seg=String(v[0]==null?'':v[0]); i=parseInt(v[1],10); }   
-  else if(v){ seg=String(v); i=s.indexOf(seg); }
-  if(!seg || !(i>=0) || i+seg.length>s.length) return '<span class="cw">'+s+'</span>';
-  return '<span class="cw">'+s.slice(0,i)+'<em>'+seg+'</em>'+s.slice(i+seg.length)+'</span>';
+  var s=String(w), v=(hl||{})[w];
+  if(!v) return '<span class="cw">'+s+'</span>';
+  
+  var parts=Array.isArray(v)&&Array.isArray(v[0])?v:[v], ranges=[];
+  parts.forEach(function(part){
+    var seg=Array.isArray(part)?String(part[0]==null?'':part[0]):String(part||'');
+    var i=Array.isArray(part)&&part[1]!=null?parseInt(part[1],10):s.indexOf(seg);
+    if(seg&&i>=0&&i+seg.length<=s.length&&s.slice(i,i+seg.length)===seg) ranges.push([i,i+seg.length]);
+  });
+  if(!ranges.length) return '<span class="cw">'+s+'</span>';
+  ranges.sort(function(a,b){ return a[0]-b[0]; });
+  var out='', last=0;
+  ranges.forEach(function(r){
+    if(r[0]<last) return;
+    out+=s.slice(last,r[0])+'<em>'+s.slice(r[0],r[1])+'</em>'; last=r[1];
+  });
+  return '<span class="cw">'+out+s.slice(last)+'</span>';
 }
 function confWordsHtml(g,info){
   return g.rows.map(function(r){ return confWordHtml(r[0],info.hl); }).join('');
@@ -771,16 +783,18 @@ function synWordsHtml(g){
 function synTitleHtml(g,info){                
   return '「'+(info.title||g.name)+'」<b class="synwd">'+g.rows[0][0]+'</b>';
 }
-function listCardHtml(g,i){
-  var key=listKey(), syn=(key==='synr'||key==='synw'), info=listInfo(g.name), no=('0'+(i+1)).slice(-2);
+function cfNoHtml(n,total){                    
+  return '<span class="cfno">'+n+' / '+total+'</span>';
+}
+function listCardHtml(g,i,no,total){
+  var key=listKey(), syn=(key==='synr'||key==='synw'), info=listInfo(g.name);
   var gp=groupProg(g);
   var head, title;
   if(syn){
-    head='<div class="cfhead swband"><span class="swchips">'+synWordsHtml(g)+'</span>'
-      +'<span class="cno syn">No.'+no+'</span></div>';
+    head='<div class="cfhead swband"><span class="swchips">'+synWordsHtml(g)+'</span>'+cfNoHtml(no,total)+'</div>';
     title=synTitleHtml(g,info);
   }else{
-    head='<div class="cfhead"><span class="cfws">'+confWordsHtml(g,info)+'</span><span class="cno">No.'+no+'</span></div>';
+    head='<div class="cfhead"><span class="cfws">'+confWordsHtml(g,info)+'</span>'+cfNoHtml(no,total)+'</div>';
     title=info.title||g.name;
   }
   
@@ -794,6 +808,8 @@ function listCardHtml(g,i){
 }
 
 var SYNCAT='';                         
+
+var SYNPAGE=0, SYNPAGE_KEY='', SYN_PAGE_SIZE=20;
 function synKind(){                    
   var m=listMod();
   return (m&&m.name)?m.name.replace('同义替换',''):'阅读';
@@ -821,9 +837,33 @@ function synActiveCat(cats,groups){
   return (g && cats.filter(function(c){ return c.groups.indexOf(g)>=0; })[0]) || cats[0];
 }
 
-function listBodyHtml(groups,keep){
+var CONFCAT='全部', CONFPAGE=0, CONF_PAGE_SIZE=20;
+var CONF_CATS=['全部','拼写','词缀','同音','其他'];
+function confCat(g){
+  var tag=(confInfo(g.name).tag||'').trim();
+  if(['换字母','换字母 · 词性','拼写型','一个字母之差','易混拼写'].indexOf(tag)>=0) return '拼写';
+  if(['词缀派生','同根异义'].indexOf(tag)>=0) return '词缀';
+  if(['同音型','同音近形'].indexOf(tag)>=0) return '同音';
+  return '其他';
+}
+function confMatch(g){
+  return CONFCAT==='全部'||confCat(g)===CONFCAT;
+}
+function confCatChips(groups){
+  var counts={}; CONF_CATS.forEach(function(c){ counts[c]=0; });
+  groups.forEach(function(g){ counts[confCat(g)]++; }); counts['全部']=groups.length;
+  return CONF_CATS.map(function(name){ return {name:name,n:counts[name]||0}; })
+    .filter(function(c){ return c.name==='全部'||c.n; });
+}
+function confPagerHtml(page,pages,total){
+  return pagerHtml(page-1,pages,'页','cfpage');
+}
+
+function listBodyHtml(groups,keep,total,offset){
   var list=keep||groups;
-  return list.map(function(g){ return listCardHtml(g, groups.indexOf(g)); }).join('');
+  total=total||list.length;
+  offset=offset||0;
+  return list.map(function(g,i){ return listCardHtml(g, groups.indexOf(g), offset+i+1, total); }).join('');
 }
 function renderList(){
   var m=listMod(), groups=listGroups();
@@ -834,28 +874,61 @@ function renderList(){
   var intro=document.getElementById('cfIntro');
   intro.style.background=m.c; intro.style.boxShadow='none';
   var introSub=(groups.length
-    ? ('共 '+groups.length+' 组 · 整组已听 '+doneGroups+' 组 · 已听 '+done+' / '+tot+' 词 · 点卡片「查看」看每组词的说明')
+    ? ('共 '+groups.length+' 组 · 整组已听 '+doneGroups+' 组 · 已听 '+done+' / '+tot+' 词')
     : '词表制作中 · 上线后这里是一组一张卡');
   intro.innerHTML='<h2>'+m.name+'</h2>'
     +'<p>'+introSub+'</p>';
   var host=document.getElementById('cfList');
   var chips=document.getElementById('cfChips');
-  if(!groups.length){ if(chips){ chips.innerHTML=''; chips.style.display='none'; } host.innerHTML=emptyWordsHtml(m); return; }
+  var listPager=document.getElementById('cfListPager');
+  if(!groups.length){
+    if(chips){ chips.innerHTML=''; chips.style.display='none'; }
+    if(listPager) listPager.innerHTML='';
+    host.innerHTML=emptyWordsHtml(m); return;
+  }
   
   var cats=synCatList(), act=synActiveCat(cats,groups), shown=groups;
   if(cats.length){
     SYNCAT=act.name;
     shown=act.groups;
     if(chips){ chips.style.display=''; chips.innerHTML=cats.map(function(c){
-      return '<span class="wchip'+(c===act?' on':'')+'" data-scat="'+c.name+'">'+c.name+'<i>'+c.words+'</i></span>';
+      return '<span class="wchip'+(c===act?' on':'')+'" data-scat="'+c.name+'">'+c.name+'<i>'+c.groups.length+'</i></span>';
     }).join(''); }
-  }else if(chips){ chips.innerHTML=''; chips.style.display='none'; }   
-  host.innerHTML=listBodyHtml(groups,shown);
-  
-  var last=parseInt(DECKI[listKey()],10)||0;
-  if(last>0){ var card=host.querySelector('.cfcard[data-cf="'+(last+1)+'"]');
     
-    if(card && card.scrollIntoView) setTimeout(function(){ card.scrollIntoView({block:'center'}); },0); }
+    var pageKey=listKey()+'|'+act.name;
+    if(SYNPAGE_KEY!==pageKey){ SYNPAGE=0; SYNPAGE_KEY=pageKey; }
+    var pages=Math.max(1,Math.ceil(shown.length/SYN_PAGE_SIZE));
+    if(SYNPAGE<=0){
+      var lastIndex=Math.max(0,Math.min(parseInt(DECKI[listKey()],10)||0,groups.length-1));
+      var lastPos=shown.indexOf(groups[lastIndex]);
+      SYNPAGE=lastPos>=0?Math.floor(lastPos/SYN_PAGE_SIZE)+1:1;
+    }
+    SYNPAGE=Math.max(1,Math.min(SYNPAGE,pages));
+    var start=(SYNPAGE-1)*SYN_PAGE_SIZE, pageList=shown.slice(start,start+SYN_PAGE_SIZE);
+    host.innerHTML=pageList.length?listBodyHtml(groups,pageList,shown.length,start)
+      : '<div class="cfempty">这一分类暂时没有词组</div>';
+    if(listPager) listPager.innerHTML=pagerHtml(SYNPAGE-1,pages,'页','synpage');
+  }else{
+    
+    if(chips){
+      chips.style.display='';
+      chips.innerHTML=confCatChips(groups).map(function(c){
+        return '<span class="wchip'+(c.name===CONFCAT?' on':'')+'" data-ccat="'+c.name+'">'+c.name+'<i>'+c.n+'</i></span>';
+      }).join('');
+    }
+    var filtered=groups.filter(confMatch);
+    var pages=Math.max(1,Math.ceil(filtered.length/CONF_PAGE_SIZE));
+    if(CONFPAGE<=0){
+      var lastIndex=Math.max(0,Math.min(parseInt(DECKI[listKey()],10)||0,groups.length-1));
+      var lastPos=filtered.indexOf(groups[lastIndex]);
+      CONFPAGE=lastPos>=0?Math.floor(lastPos/CONF_PAGE_SIZE)+1:1;
+    }
+    CONFPAGE=Math.max(1,Math.min(CONFPAGE,pages));
+    var start=(CONFPAGE-1)*CONF_PAGE_SIZE, pageList=filtered.slice(start,start+CONF_PAGE_SIZE);
+    host.innerHTML=pageList.length?listBodyHtml(groups,pageList,filtered.length,start)
+      : '<div class="cfempty">这一分类暂时没有词组</div>';
+    if(listPager) listPager.innerHTML=confPagerHtml(CONFPAGE,pages,filtered.length);
+  }
 }
 
 function cfWordBlockHtml(r,key,info,modKey){
@@ -879,7 +952,7 @@ function cfWordBlockHtml(r,key,info,modKey){
       return '<b>'+c[0]+'</b>'+(c[1]?'<span>'+c[1]+'</span>':''); }).join('<em class="cfsemi">；</em>')+'</span></p>';
   }
   
-  if(d.en) h+='<p class="cfeg"><span class="cflab">例句'+(d.src?' · '+d.src:'')+'</span>'
+  if(d.en) h+='<p class="cfeg"><span class="cflab">例句</span>'
     +'<span class="cfegt">'+d.en+'</span></p>';
   if(d.cn) h+='<p class="cfcn2"><span class="cflab gray">译文</span><span class="cfcnt">'+d.cn+'</span></p>';
   if(d.note) h+='<p class="cfnote">'+d.note+'</p>';
@@ -891,6 +964,36 @@ function cfMnHtml(list,title){
   return '<div class="cfmn"><div class="cfmnh">'+(title||'记忆口诀')+'</div><ol class="cfmnl">'
     +list.map(function(s,i){ return '<li><span class="cfmnn">'+(i+1)+'</span><span>'+s+'</span></li>'; }).join('')
     +'</ol></div>';
+}
+
+function synPartHead(no,title){
+  return '<div class="synsec"><span class="synsecn">'+no+'</span>'
+    +'<span class="synsect">'+title+'</span></div>';
+}
+function synPhrasesHtml(list){
+  if(!list||!list.length) return '';
+  return synPartHead(2,'换短语 · 由词到词组')
+    +'<div class="synphrases">'+list.map(function(p){
+      return '<div class="synph"><span class="synphi" aria-hidden="true"></span>'
+        +'<div class="synphb"><div class="synphh"><b>'+p.p+'</b>'
+        +(p.note?'<span class="synpnote">'+p.note+'</span>':'')+'</div>'
+        +(p.cn?'<p class="synphc">'+p.cn+'</p>':'')
+        +(p.use?'<p class="synphu"><span class="cflab">例句</span><span>'+p.use+'</span></p>':'')
+        +'</div></div>';
+    }).join('')+'</div>';
+}
+function synSentencesHtml(info){
+  var list=info.patterns||[];
+  if(!list.length) return '';
+  var base=info.base?'<div class="synbase"><div class="synbasel">原句 · 普通说法</div>'
+    +'<p class="synbasee">'+info.base+'</p>'
+    +(info.baseCn?'<p class="synbasec">'+info.baseCn+'</p>':'')+'</div>':'';
+  return synPartHead(3,'换句子 · 原句改写成高分句')+base
+    +'<div class="synrews">'+list.map(function(p){
+      return '<div class="synrew"><span class="synphi" aria-hidden="true"></span><div class="synrewb">'
+        +'<p class="synrewe">'+p.to+'</p>'
+        +(p.note?'<span class="synpnote">'+p.note+'</span>':'')+'</div></div>';
+    }).join('')+'</div>';
 }
 
 function pagerHtml(i,n,unit,key){
@@ -914,22 +1017,25 @@ function renderListGroup(){
   DECKI[listKey()]=i;
   var g=groups[i];
   if(!g){ go('conf'); return; }
-  var key=listKey(), syn=(key==='synr'||key==='synw'), info=listInfo(g.name), no=('0'+(i+1)).slice(-2);
+  var key=listKey(), syn=(key==='synr'||key==='synw'), synw=(key==='synw'), info=listInfo(g.name);
   var gis=groups.map(function(x,k){ return k; }).join(',');   
   var deck='<div class="cfwords" data-deck="'+listKey()+'" data-i="'+i+'" data-n="'+groups.length+'" data-gis="'+gis+'">';
   g.rows.forEach(function(r,j){ deck+=cfWordBlockHtml(r,g._keys[j],info); });
   deck+='</div>';
   var h;
   
-  h='<div class="card2 cgcard'+(syn?' syncard':'')+'">'
+  h='<div class="card2 cgcard'+(syn?' syncard':'')+(synw?' synwcard':'')+'">'
     +'<div class="cfhead'+(syn?' swband':'')+'"><div class="cfhrow">'
-      +(syn?'<span class="swchips">'+synWordsHtml(g)+'</span><span class="cno syn">No.'+no+'</span>'
-           :'<span class="cfws">'+confWordsHtml(g,info)+'</span><span class="cno">No.'+no+'</span>')
+      +(syn?'<span class="swchips">'+synWordsHtml(g)+'</span>'
+           :'<span class="cfws">'+confWordsHtml(g,info)+'</span>')
       +'</div>'
     +'<h4 class="cfht">'+(syn?synTitleHtml(g,info):(info.title||g.name))+'</h4>'
     +(info.note?'<p class="cfdesc">'+info.note+'</p>':'')
     +'</div>'
-    +deck+'</div>'+cfMnHtml(info.mnemonic, syn?'替换指南':null)
+    +(synw?synPartHead(1,'换单词 · 一个意思换一串词'):'')
+    +deck
+    +(synw?synPhrasesHtml(info.phrases)+synSentencesHtml(info):'')
+    +'</div>'+cfMnHtml(info.mnemonic, syn?'替换指南':null)
     +pagerHtml(i,groups.length,'组',key);
   var body=document.getElementById('cgBody');
   body.innerHTML=h;
@@ -1222,43 +1328,49 @@ var rAgain=document.getElementById('rAgain'); if(rAgain) rAgain.addEventListener
 function renderMine(){
   
   document.getElementById('mineName').textContent='游客';
-  document.getElementById('mineSub').textContent='进度仅存本机 · 可导出备份到其它设备';
+  document.getElementById('mineSub').textContent='进度仅存本机';
   document.getElementById('mineAv').textContent='知';
-  document.getElementById('loginBtn').textContent='导出 / 导入数据';
-  
-  document.getElementById('loginBtn').className='btn sm';
   document.getElementById('favN').textContent=Object.keys(S.fav||{}).length+' 词';
   
 }
-document.getElementById('loginBtn').addEventListener('click',function(){
-  
-  exportImportData();
-});
-
-function exportImportData(){
-  var w=document.getElementById('impWrap'); if(w) w.style.display = w.style.display==='flex'?'none':'flex';
+function openResetModal(){
+  var modal=document.getElementById('resetModal');
+  if(!modal) return;
+  modal.style.display='flex';
+  var card=modal.querySelector('.reset-card');
+  if(card) card.focus();
 }
-document.getElementById('expBtn').addEventListener('click',function(){
-  try{
-    var data={ app:'ysmp', ver:'1.1', ts:Date.now(), state:JSON.parse(JSON.stringify(S)) };
-    var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='雅思听力_我的数据_'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(a.href);
-    toast('已导出 · 数据仅存于你本机'); track('data_export');
-  }catch(e){ toast('导出失败'); }
-});
-document.getElementById('impFile').addEventListener('change',function(e){
-  var f=e.target.files&&e.target.files[0]; if(!f) return;
-  var rd=new FileReader();
-  rd.onload=function(){
-    try{ var d=JSON.parse(rd.result); if(!d||!d.state) throw 0;
-      S=d.state; save(); renderMine(); renderHomeOv(); renderMwideStat(); renderVocabStat();
-      toast('导入成功 · 进度已恢复'); track('data_import');
-    }catch(err){ toast('文件格式不正确'); }
-    e.target.value='';
-  };
-  rd.readAsText(f);
-});
+function openAboutDoc(){
+  var modal=document.getElementById('aboutDoc');
+  if(!modal) return;
+  modal.style.display='flex';
+  var card=modal.querySelector('.about-card');
+  if(card) card.focus();
+}
+(function aboutDocInit(){
+  var modal=document.getElementById('aboutDoc');
+  var close=document.getElementById('aboutClose');
+  if(!modal||!close) return;
+  function hide(){ modal.style.display='none'; }
+  close.addEventListener('click',hide);
+  modal.addEventListener('click',function(e){ if(e.target===modal) hide(); });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && modal.style.display==='flex') hide();
+  });
+})();
+(function resetConfirmInit(){
+  var modal=document.getElementById('resetModal');
+  var cancel=document.getElementById('resetCancel');
+  var confirm=document.getElementById('resetConfirm');
+  if(!modal||!cancel||!confirm) return;
+  function close(){ modal.style.display='none'; }
+  cancel.addEventListener('click',close);
+  confirm.addEventListener('click',function(){ localStorage.removeItem(KEY); location.reload(); });
+  modal.addEventListener('click',function(e){ if(e.target===modal) close(); });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && modal.style.display==='flex') close();
+  });
+})();
 
 var PA={ USE_MOCK:true, API_BASE:'/api', COOLDOWN:60, _cd:null };
 
@@ -1423,7 +1535,7 @@ document.getElementById('backBtn').addEventListener('click',back);
 
 (function(){ var b=document.getElementById('copyLinkBtn'); if(b) b.addEventListener('click',copyLink); })();
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-to],[data-open],[data-s],[data-scene],[data-series],[data-mod],[data-group],[data-cf],[data-cfpg],[data-chip],[data-scat]');
+  var t=e.target.closest('[data-to],[data-open],[data-s],[data-scene],[data-series],[data-mod],[data-group],[data-cf],[data-cfpg],[data-chip],[data-ccat],[data-scat]');
   if(!t) return;
   var to=t.getAttribute('data-to');
   if(to){ go(to); return; }
@@ -1432,7 +1544,10 @@ document.addEventListener('click',function(e){
   var sc=t.getAttribute('data-scene');
   if(sc){ onScene(sc); return; }
   var se=t.getAttribute('data-series');
-  if(se){ go('scenes'); return; }
+  if(se){
+    track('module_click',{area:'scene',module:se});
+    go('scenes'); return;
+  }
   
   var grp=t.getAttribute('data-group');
   if(grp!==null&&grp!==undefined){
@@ -1451,16 +1566,44 @@ document.addEventListener('click',function(e){
   var md=t.getAttribute('data-mod');
   
   
-  if(md){ WORDMOD=md; if(DECKI[md]==null) DECKI[md]=0; go((modOf(md)||{}).to||'words'); return; }
+  if(md){
+    track('module_click',{area:'vocab',module:md});
+    WORDMOD=md; if(DECKI[md]==null) DECKI[md]=0;
+    if(md==='conf'){ CONFCAT='全部'; CONFPAGE=0; }
+    go((modOf(md)||{}).to||'words'); return;
+  }
   
   var cf=t.getAttribute('data-cf');
   if(cf){ var ci=parseInt(cf,10)-1; if(!isNaN(ci)){ DECKI[listKey()]=ci; markStudied(listKey(),ci); } go('confgrp'); return; }
+  
+  var lpg=t.getAttribute('data-cfpg');
+  if(lpg!==null&&lpg!==undefined&&t.getAttribute('data-pgkey')==='cfpage'){
+    var lstep=parseInt(lpg,10);
+    if(lstep){ CONFPAGE=Math.max(1,CONFPAGE+lstep); renderList(); window.scrollTo(0,0); }
+    return;
+  }
+  
+  var spg=t.getAttribute('data-cfpg');
+  if(spg!==null&&spg!==undefined&&t.getAttribute('data-pgkey')==='synpage'){
+    var sstep=parseInt(spg,10);
+    if(sstep){ SYNPAGE=Math.max(1,SYNPAGE+sstep); renderList(); window.scrollTo(0,0); }
+    return;
+  }
   
   var pg=t.getAttribute('data-cfpg');
   if(pg!==null&&pg!==undefined){
     var pk=t.getAttribute('data-pgkey'), step=parseInt(pg,10);
     if(pk==='conf'||pk==='synr'||pk==='synw') listGroupGo(step);
     else if(pk) deckGo(pk,step);
+    return;
+  }
+  
+  var cc=t.getAttribute('data-ccat');
+  if(cc!==null&&cc!==undefined){
+    if(cc===CONFCAT) return;
+    CONFCAT=cc; CONFPAGE=1;
+    renderList();
+    window.scrollTo(0,0);
     return;
   }
   
@@ -1492,12 +1635,12 @@ document.addEventListener('click',function(e){
   var k=t.getAttribute('data-s');
   if(k==='quiz'){ go('quiz'); }
   else if(k==='seriesSoon') toast('该系列制作中 · 先体验「听力场景课」');
-  else if(k==='about') toast('词汇素材为教学自拟 · 真题题号仅作溯源标注');
+  else if(k==='about'){ openAboutDoc(); }
   else if(k==='community'){ track('community_click_mine'); go('home'); setTimeout(function(){ var c=document.getElementById('homeCommSec'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); },80); }
   
   else if(k==='statset'){ var m=document.getElementById('consentModal'); if(m) m.style.display='flex'; }
   else if(k==='privdoc'){ openPrivacyDoc(); }
-  else if(k==='reset'){ localStorage.removeItem(KEY); location.reload(); }
+  else if(k==='reset'){ openResetModal(); }
 });
 document.querySelectorAll('.tbi[data-tab]').forEach(function(el){ el.addEventListener('click',function(){
   var id=this.getAttribute('data-tab')==='home'?'home':'mine';
@@ -1515,10 +1658,6 @@ function renderMwideStat(){
   var el=document.getElementById('mwStat'); if(!el) return;
   
   var sceneMods=MODS.filter(function(m){ return m.kind==='scene'; });
-  var sceneTot=sceneMods.length;   
-  var sceneDone=sceneMods.filter(function(m){
-    return m.groups.every(function(g){ return g.rows.every(function(r,i){ return (S.done||{})[g._keys[i]]; }); });
-  }).length;
   var stTot=0, stDone=0, wTot=0, wDone=0, set={};
   sceneMods.forEach(function(m){ m.groups.forEach(function(g){
     stTot++;
@@ -1526,7 +1665,7 @@ function renderMwideStat(){
     g.rows.forEach(function(r,i){ wTot++; set[g._keys[i]]=1; });
   }); });
   for(var k in (S.done||{})){ if(set[k]) wDone++; }
-  el.innerHTML='已完成 '+sceneDone+'/'+sceneTot+' 场景 · '+stDone+'/'+stTot+' 组 · 已听 '+wDone+'/'+wTot+' 词';
+  el.innerHTML=stDone+'/'+stTot+' 组 · 已听 '+wDone+'/'+wTot+' 词';
   var bar=document.getElementById('mwBar'); if(bar) bar.style.width=(wTot?Math.round(wDone/wTot*100):0)+'%';
 }
 
